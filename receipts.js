@@ -43,7 +43,7 @@ const fakeStreet = () => `${pick(STREETS)} No.${randInt(1, 200)}`;
 const fakePhone = () => `08${randInt(10, 99)}${randInt(1000000, 99999999)}`;
 const fakeEmail = () => `${pick(FIRST_NAMES).toLowerCase()}${randInt(1, 999)}@gmail.com`;
 const fakePlat = () => `B ${randInt(1000, 9999)} ${pick(['A', 'B', 'C', 'D', 'E', 'F'])}`;
-const now = () => new Date();
+const now = () => { const d = new Date(); d.setDate(d.getDate() - 1); return d; }; // -1 day: server CST+8, BOC validator UTC → date must be in the past
 const fmtDate = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 const fmtDateEn = (d) => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

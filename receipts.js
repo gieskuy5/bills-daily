@@ -116,9 +116,9 @@ class ReceiptPDF {
     if (logoFile) {
       const fp = path.join(LOGO_DIR, logoFile);
       if (fs.existsSync(fp)) {
-        const logoW = 45;
+        const logoW = 90;
         this.doc.image(fp, this.cx - logoW / 2, this.y, { width: logoW });
-        this.y += 50;
+        this.y += 95;
       }
     }
 
@@ -215,9 +215,9 @@ class ReceiptPDF {
     if (logoFile) {
       const fp = path.join(LOGO_DIR, logoFile);
       if (fs.existsSync(fp)) {
-        const logoW = 40;
+        const logoW = 80;
         this.doc.image(fp, this.cx - logoW / 2, this.y, { width: logoW });
-        this.y += 45;
+        this.y += 85;
       }
     }
 

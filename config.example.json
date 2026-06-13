@@ -1,6 +1,9 @@
 {
   "api_base": "https://bocapi.billsonchain.io",
   "site_url": "https://billsonchain.io",
+  "callback_url": "https://billsonchain.io/dashboard",
+
+  "captcha_provider": "auto",
   "capsolver_key": "YOUR_CAPSOLVER_API_KEY",
-  "callback_url": "https://billsonchain.io/dashboard"
+  "twocaptcha_key": "YOUR_2CAPTCHA_API_KEY"
 }

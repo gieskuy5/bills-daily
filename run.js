@@ -32,8 +32,11 @@ const {
 } = CFG;
 
 const TURNSTILE_KEY = '0x4AAAAAADKR0bu1HvcUPYJ1';
-// CLOAKBROWSER_BIN no longer needed — full HTTP
 const SESSIONS_FILE = path.join(DIR, 'sessions.json');
+
+// Captcha provider keys from config
+const TWOCAPTCHA_KEY = CFG.twocaptcha_key || null;
+const CAPTCHA_PROVIDER = CFG.captcha_provider || 'auto'; // auto | capsolver | twocaptcha
 
 // ─── CLI Args ───────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -133,12 +136,42 @@ function proxyFetchOpts(proxy) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CAPSOLVER TURNSTILE
+// CAPTCHA SOLVER (Capsolver + 2Captcha)
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function solveTurnstile() {
   console.log(`  🧩 Solving Turnstile...`);
 
+  // Determine provider order
+  let providers = [];
+  if (CAPTCHA_PROVIDER === 'capsolver') providers = ['capsolver'];
+  else if (CAPTCHA_PROVIDER === 'twocaptcha') providers = ['twocaptcha'];
+  else { // auto — try available ones
+    if (CAPSOLVER_KEY) providers.push('capsolver');
+    if (TWOCAPTCHA_KEY) providers.push('twocaptcha');
+  }
+
+  if (!providers.length) throw new Error('No captcha provider configured. Set capsolver_key or twocaptcha_key in config.json');
+
+  let lastError;
+  for (const provider of providers) {
+    try {
+      const token = provider === 'capsolver'
+        ? await solveCapsolver()
+        : await solve2Captcha();
+      console.log(`  ✅ Turnstile solved via ${provider} (${token.length} chars)`);
+      return token;
+    } catch (e) {
+      lastError = e;
+      console.log(`  ⚠️ ${provider} failed: ${e.message}`);
+      if (providers.length > 1) console.log(`  Trying next provider...`);
+    }
+  }
+  throw lastError || new Error('All captcha providers failed');
+}
+
+// ─── Capsolver ─────────────────────────────────────────────────────────────
+async function solveCapsolver() {
   const createRes = await fetchJSON('https://api.capsolver.com/createTask', {
     clientKey: CAPSOLVER_KEY,
     task: {
@@ -158,25 +191,41 @@ async function solveTurnstile() {
       clientKey: CAPSOLVER_KEY, taskId
     });
     if (pollRes.errorId !== 0) throw new Error(`Capsolver poll: ${JSON.stringify(pollRes)}`);
-    if (pollRes.status === 'ready') {
-      const token = pollRes.solution.token;
-      console.log(`  ✅ Turnstile solved (${token.length} chars)`);
-      return token;
-    }
+    if (pollRes.status === 'ready') return pollRes.solution.token;
   }
   throw new Error('Capsolver timeout (120s)');
 }
 
-async function fetchJSON(url, body, timeout = 15000) {
+// ─── 2Captcha ──────────────────────────────────────────────────────────────
+async function solve2Captcha() {
+  // Step 1: Submit task
+  const submitUrl = `https://2captcha.com/in.php?key=${TWOCAPTCHA_KEY}&method=turnstile&sitekey=${TURNSTILE_KEY}&pageurl=${encodeURIComponent(SITE_URL + '/login')}&json=1`;
+  const submitRes = await fetchJSON(submitUrl, null, 15000, 'GET');
+
+  if (submitRes.status !== 1) throw new Error(`2Captcha submit: ${submitRes.request || submitRes.error_text || JSON.stringify(submitRes)}`);
+  const taskId = submitRes.request;
+  console.log(`    Task ID: ${taskId}`);
+
+  // Step 2: Poll for result
+  for (let i = 0; i < 60; i++) {
+    await sleep(5000); // 2Captcha is slower, poll every 5s
+    const pollUrl = `https://2captcha.com/res.php?key=${TWOCAPTCHA_KEY}&action=get&id=${taskId}&json=1`;
+    const pollRes = await fetchJSON(pollUrl, null, 15000, 'GET');
+
+    if (pollRes.status === 1) return pollRes.request;
+    if (pollRes.request === 'CAPCHA_NOT_READY') continue;
+    throw new Error(`2Captcha error: ${pollRes.request || JSON.stringify(pollRes)}`);
+  }
+  throw new Error('2Captcha timeout (300s)');
+}
+
+async function fetchJSON(url, body, timeout = 15000, method = 'POST') {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+    const opts = { method, headers: { 'Content-Type': 'application/json' }, signal: controller.signal };
+    if (body && method === 'POST') opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
     clearTimeout(timer);
     return res.json();
   } catch (e) {

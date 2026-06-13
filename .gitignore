@@ -5,3 +5,5 @@ proxy.txt
 sessions.json
 results.json
 *.pdf
+__pycache__/
+indomaret_logo.jpg

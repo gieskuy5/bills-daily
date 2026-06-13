@@ -13,7 +13,6 @@
     "imapflow": "^1.4.0",
     "mailparser": "^3.9.9",
     "pdfkit": "^0.19.1",
-    "playwright-core": "^1.60.0",
     "socks": "^2.8.9",
     "undici": "^8.4.1"
   }

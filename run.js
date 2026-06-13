@@ -32,7 +32,7 @@ const {
 } = CFG;
 
 const TURNSTILE_KEY = '0x4AAAAAADKR0bu1HvcUPYJ1';
-const CLOAKBROWSER_BIN = '/home/ubuntu/.cloakbrowser/chromium-146.0.7680.177.5/chrome';
+// CLOAKBROWSER_BIN no longer needed — full HTTP
 const SESSIONS_FILE = path.join(DIR, 'sessions.json');
 
 // ─── CLI Args ───────────────────────────────────────────────────────────────
@@ -329,79 +329,25 @@ async function createDispatcher(proxy) {
 const { generateRandomReceipt: generateReceipt } = require('./receipts.js');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLOAKBROWSER UPLOAD (Playwright + CloakBrowser binary)
+// FULL HTTP UPLOAD (no browser)
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function cloakUpload(sessionToken, fp, proxy, count) {
-  const { chromium } = require('playwright-core');
+async function uploadBills(sessionToken, fp, proxy, count) {
+  const cookie = `__Secure-better-auth.session_token=${sessionToken}`;
+  const apiHeaders = {
+    ...buildHeaders(fp),
+    'Cookie': cookie,
+  };
 
-  // Build Playwright proxy config
-  let pwProxy = undefined;
+  let dispatcher;
   if (proxy) {
-    pwProxy = { server: proxy.server };
-    if (proxy.username) {
-      pwProxy.username = proxy.username;
-      pwProxy.password = proxy.password;
-    }
+    try { dispatcher = await createDispatcher(proxy); } catch {}
   }
-
-  // Launch CloakBrowser's stealth Chromium
-  const browser = await chromium.launch({
-    executablePath: CLOAKBROWSER_BIN,
-    headless: true,
-    args: [
-      '--headless=new',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=IsolateOrigins,site-per-process',
-    ],
-    proxy: pwProxy,
-  });
-
-  const context = await browser.newContext({
-    userAgent: fp.ua,
-    locale: 'en-US',
-    viewport: { width: 1366, height: 768 },
-  });
-
-  // Set session cookie (skip browser login)
-  await context.addCookies([{
-    name: '__Secure-better-auth.session_token',
-    value: sessionToken,
-    domain: '.billsonchain.io',
-    path: '/',
-    secure: true,
-    httpOnly: true,
-    sameSite: 'Lax',
-  }]);
-
-  // Set fingerprint headers
-  await context.setExtraHTTPHeaders({
-    'User-Agent': fp.ua,
-    'Accept-Language': fp.lang,
-    'sec-ch-ua': fp.secCh,
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': fp.platform,
-  });
-
-  const page = await context.newPage();
-
-  // Verify login
-  await page.goto(`${SITE_URL}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(3000);
-
-  if (page.url().includes('login')) {
-    console.log('  ❌ Cookie invalid, not logged in!');
-    await browser.close();
-    return { success: 0, failed: count, categories: {} };
-  }
-
-  console.log(`  ✅ Browser session OK: ${page.url()}`);
 
   let success = 0, failed = 0;
   const catStats = {};
 
   for (let i = 0; i < count; i++) {
-    // Generate receipt via Python
     let receipt;
     try {
       receipt = await generateReceipt();
@@ -417,22 +363,23 @@ async function cloakUpload(sessionToken, fp, proxy, count) {
     console.log(`    [1] PDF: ${filename} (${size} bytes)`);
 
     try {
-      // Init upload (in-page fetch with cookies)
-      const initResult = await page.evaluate(async ([filename, fileSize]) => {
-        try {
-          const r = await fetch('https://bocapi.billsonchain.io/api/bill/init', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ filename, contentType: 'application/pdf', fileSizeBytes: fileSize }),
-          });
-          return await r.json();
-        } catch (e) { return { ok: false, error: { message: e.message } }; }
-      }, [filename, size]);
+      // Step 1: Init upload
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const initRes = await fetch(`${API_BASE}/api/bill/init`, {
+        method: 'POST',
+        headers: apiHeaders,
+        body: JSON.stringify({ filename, contentType: 'application/pdf', fileSizeBytes: size }),
+        signal: controller.signal,
+        dispatcher,
+      });
+      clearTimeout(timer);
+      const initResult = await initRes.json();
 
       if (!initResult.ok) {
         console.log(`    [-] Init failed: ${JSON.stringify(initResult)}`);
         failed++;
+        try { fs.unlinkSync(filepath); } catch {}
         continue;
       }
 
@@ -440,7 +387,7 @@ async function cloakUpload(sessionToken, fp, proxy, count) {
       const uploadUrl = initResult.data.uploadUrl;
       console.log(`    [2] Init OK: ${billId}`);
 
-      // S3 upload (direct from Node.js)
+      // Step 2: S3 upload (direct PUT, no auth needed)
       const pdfData = fs.readFileSync(filepath);
       const s3Res = await fetch(uploadUrl, {
         method: 'PUT',
@@ -450,22 +397,22 @@ async function cloakUpload(sessionToken, fp, proxy, count) {
       if (!s3Res.ok) throw new Error(`S3 upload failed: ${s3Res.status}`);
       console.log(`    [3] S3 upload OK`);
 
-      // Confirm
-      const confirmResult = await page.evaluate(async (billId) => {
-        try {
-          const r = await fetch(`https://bocapi.billsonchain.io/api/bill/${billId}/confirm`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: null,
-          });
-          return await r.json();
-        } catch (e) { return { ok: false, error: { message: e.message } }; }
-      }, billId);
+      // Step 3: Confirm
+      const c2 = new AbortController();
+      const t2 = setTimeout(() => c2.abort(), 15000);
+      const confirmRes = await fetch(`${API_BASE}/api/bill/${billId}/confirm`, {
+        method: 'POST',
+        headers: { ...apiHeaders, 'Content-Type': 'application/json' },
+        body: null,
+        signal: c2.signal,
+        dispatcher,
+      });
+      clearTimeout(t2);
+      const confirmResult = await confirmRes.json();
 
       if (confirmResult.ok) {
         const status = confirmResult.data?.status || 'unknown';
-        console.log(`    [4] ✅ Confirmed! Status: ${status}`);
+        console.log(`    [4] Confirmed! Status: ${status}`);
         success++;
         catStats[category] = (catStats[category] || 0) + 1;
       } else {
@@ -473,7 +420,6 @@ async function cloakUpload(sessionToken, fp, proxy, count) {
         failed++;
       }
 
-      // Cleanup temp file
       try { fs.unlinkSync(filepath); } catch {}
 
     } catch (e) {
@@ -481,7 +427,6 @@ async function cloakUpload(sessionToken, fp, proxy, count) {
       failed++;
     }
 
-    // Delay between uploads
     if (i < count - 1) {
       const delay = randInt(OPT.delayMin, OPT.delayMax);
       console.log(`    [~] Waiting ${delay}s...`);
@@ -489,7 +434,6 @@ async function cloakUpload(sessionToken, fp, proxy, count) {
     }
   }
 
-  await browser.close();
   return { success, failed, categories: catStats };
 }
 
@@ -575,7 +519,7 @@ async function main() {
       // Step 3: Upload via CloakBrowser
       if (OPT.upload > 0) {
         console.log(`\n  📤 Uploading ${OPT.upload} receipt(s)...`);
-        const uploadResult = await cloakUpload(sessionToken, fp, proxy, OPT.upload);
+        const uploadResult = await uploadBills(sessionToken, fp, proxy, OPT.upload);
         result.upload = uploadResult;
         totalSuccess += uploadResult.success;
         totalFailed += uploadResult.failed;

@@ -56,59 +56,59 @@ const fmtMonthYear = (d) => {
 // ─── Thermal Receipt PDF Builder (80mm thermal paper) ─────────────────────
 class ReceiptPDF {
   constructor(opts = {}) {
-    // 80mm thermal paper = ~226pt wide, variable height
-    this.W = 226;
-    this.lx = 8;   // left margin
-    this.rx = this.W - 8;  // right margin
-    this.colW = this.W - 16;  // content width
+    // HD receipt = ~452pt wide (160mm), variable height
+    this.W = 452;
+    this.lx = 16;  // left margin
+    this.rx = this.W - 16; // right margin
+    this.colW = this.W - 32; // content width
     this.cx = this.W / 2;    // center
-    this.y = 10;
+    this.y = 20;
     this.doc = new PDFDocument({
-      size: [this.W, 841.89],  // narrow thermal, A4 height (will auto-expand)
-      margins: { top: 10, bottom: 10, left: this.lx, right: this.lx },
+      size: [this.W, 1200], // HD receipt width, tall enough
+      margins: { top: 20, bottom: 20, left: this.lx, right: this.lx },
     });
     this._receiptDate = null;  // set by generators
   }
 
   // ── Centered text ──
-  _center(text, y, font = 'Courier', size = 7, color = '#000') {
+  _center(text, y, font = 'Courier', size = 14, color = '#000') {
     this.doc.font(font).fontSize(size).fillColor(color);
     this.doc.text(String(text), this.lx, y, { width: this.colW, align: 'center' });
   }
 
   // ── Left-right row ──
-  _row(left, right, y, font = 'Courier', size = 7, color = '#000') {
+  _row(left, right, y, font = 'Courier', size = 14, color = '#000') {
     this.doc.font(font).fontSize(size).fillColor(color);
-    this.doc.text(String(left), this.lx, y, { width: 130, align: 'left' });
+    this.doc.text(String(left), this.lx, y, { width: 260, align: 'left' });
     this.doc.text(String(right), this.lx, y, { width: this.colW, align: 'right' });
   }
 
   // ── Key-value row ──
   _kv(label, value) {
-    this.doc.font('Courier').fontSize(6.5).fillColor('#000');
-    this.doc.text(String(label), this.lx, this.y, { width: 52, align: 'left' });
-    this.doc.text(String(value), this.lx + 52, this.y, { width: this.colW - 52, align: 'left' });
-    this.y += 9;
+    this.doc.font('Courier').fontSize(13).fillColor('#000');
+    this.doc.text(String(label), this.lx, this.y, { width: 104, align: 'left' });
+    this.doc.text(String(value), this.lx + 104, this.y, { width: this.colW - 104, align: 'left' });
+    this.y += 18;
   }
 
   // ── Dashed separator ──
   _dash() {
-    this._center('-------------------------------------------', this.y, 'Courier', 6);
-    this.y += 8;
+    this._center('---------------------------------------------------------------------------------------', this.y, 'Courier', 12);
+    this.y += 16;
   }
 
   // ── Solid line ──
   _line() {
-    this._center('===========================================', this.y, 'Courier', 6);
-    this.y += 8;
+    this._center('=======================================================================================', this.y, 'Courier', 12);
+    this.y += 16;
   }
 
   // ── Double line ──
   _dline() {
-    this._center('===========================================', this.y, 'Courier', 6);
-    this.y += 3;
-    this._center('===========================================', this.y, 'Courier', 6);
-    this.y += 8;
+    this._center('=======================================================================================', this.y, 'Courier', 12);
+    this.y += 6;
+    this._center('=======================================================================================', this.y, 'Courier', 12);
+    this.y += 16;
   }
 
   // ── Store header: logo + name + address (all centered) ──
@@ -116,22 +116,22 @@ class ReceiptPDF {
     if (logoFile) {
       const fp = path.join(LOGO_DIR, logoFile);
       if (fs.existsSync(fp)) {
-        const logoW = 90;
+        const logoW = 180;
         this.doc.image(fp, this.cx - logoW / 2, this.y, { width: logoW });
-        this.y += 36;
+        this.y += 72;
       }
     }
 
-    this._center(storeName, this.y, 'Helvetica-Bold', 8);
-    this.y += 11;
+    this._center(storeName, this.y, 'Helvetica-Bold', 16);
+    this.y += 22;
 
     for (const line of address) {
-      this._center(line, this.y, 'Courier', 5.5, '#333');
-      this.y += 8;
+      this._center(line, this.y, 'Courier', 11, '#333');
+      this.y += 16;
     }
     for (const line of extraLines) {
-      this._center(line, this.y, 'Courier', 5, '#555');
-      this.y += 7;
+      this._center(line, this.y, 'Courier', 10, '#555');
+      this.y += 14;
     }
 
     this._line();
@@ -153,19 +153,19 @@ class ReceiptPDF {
 
       if (showQty && qty > 1) {
         // Qty x Name
-        this.doc.font('Courier').fontSize(6.5).fillColor('#000');
-        this.doc.text(`${qty}x ${item.name}`, this.lx, this.y, { width: 140, align: 'left' });
+        this.doc.font('Courier').fontSize(13).fillColor('#000');
+        this.doc.text(`${qty}x ${item.name}`, this.lx, this.y, { width: 280, align: 'left' });
         this.doc.text(`${rupiahRaw(total)}`, this.lx, this.y, { width: this.colW, align: 'right' });
-        this.y += 9;
+        this.y += 18;
         // Unit price
-        this.doc.font('Courier').fontSize(5.5).fillColor('#555');
-        this.doc.text(`  @${rupiahRaw(item.price)}`, this.lx, this.y, { width: 140, align: 'left' });
-        this.y += 8;
+        this.doc.font('Courier').fontSize(11).fillColor('#555');
+        this.doc.text(`  @${rupiahRaw(item.price)}`, this.lx, this.y, { width: 280, align: 'left' });
+        this.y += 16;
       } else {
-        this.doc.font('Courier').fontSize(6.5).fillColor('#000');
-        this.doc.text(item.name, this.lx, this.y, { width: 140, align: 'left' });
+        this.doc.font('Courier').fontSize(13).fillColor('#000');
+        this.doc.text(item.name, this.lx, this.y, { width: 280, align: 'left' });
         this.doc.text(`${rupiahRaw(total)}`, this.lx, this.y, { width: this.colW, align: 'right' });
-        this.y += 9;
+        this.y += 18;
       }
     }
   }
@@ -174,13 +174,13 @@ class ReceiptPDF {
   summary(rows, totalRow) {
     this._dash();
     for (const [label, value] of rows) {
-      this._row(label, value, this.y, 'Courier', 6.5);
-      this.y += 9;
+      this._row(label, value, this.y, 'Courier', 13);
+      this.y += 18;
     }
     if (totalRow) {
       this._dline();
-      this._row(totalRow[0], totalRow[1], this.y, 'Helvetica-Bold', 8);
-      this.y += 12;
+      this._row(totalRow[0], totalRow[1], this.y, 'Helvetica-Bold', 16);
+      this.y += 24;
     }
   }
 
@@ -195,18 +195,18 @@ class ReceiptPDF {
   // ── Barcode ──
   barcode(code) {
     this._dash();
-    this._center(code, this.y, 'Courier', 7);
-    this.y += 10;
+    this._center(code, this.y, 'Courier', 14);
+    this.y += 20;
   }
 
   // ── Footer ──
   footer(lines = []) {
     this._line();
-    this._center('TERIMA KASIH ATAS KUNJUNGAN ANDA', this.y, 'Helvetica-Bold', 6);
-    this.y += 10;
+    this._center('TERIMA KASIH ATAS KUNJUNGAN ANDA', this.y, 'Helvetica-Bold', 12);
+    this.y += 20;
     for (const line of lines) {
-      this._center(line, this.y, 'Courier', 5, '#555');
-      this.y += 7;
+      this._center(line, this.y, 'Courier', 10, '#555');
+      this.y += 14;
     }
   }
 
@@ -222,13 +222,13 @@ class ReceiptPDF {
     }
 
     this._center(companyName, this.y, 'Helvetica-Bold', 7.5);
-    this.y += 10;
+    this.y += 20;
     for (const line of companyAddr) {
       this._center(line, this.y, 'Courier', 5, '#444');
-      this.y += 7;
+      this.y += 14;
     }
 
-    this.y += 3;
+    this.y += 6;
     this._dash();
     for (const [label, value] of invoiceInfo) {
       this._kv(label, value);
@@ -238,9 +238,9 @@ class ReceiptPDF {
 
   // ── Section title ──
   section(title) {
-    this.doc.font('Helvetica-Bold').fontSize(7).fillColor('#000');
+    this.doc.font('Helvetica-Bold').fontSize(14).fillColor('#000');
     this.doc.text(title.toUpperCase(), this.lx, this.y, { width: this.colW, align: 'left' });
-    this.y += 10;
+    this.y += 20;
   }
 
   toBuffer() {

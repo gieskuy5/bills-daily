@@ -1,15 +1,15 @@
 # BillsOnChain — Login + Upload Pipeline
 
-Automated bill upload pipeline for BillsOnChain. Login via HTTP API, upload receipts via Playwright + CloakBrowser stealth Chromium.
+Automated bill upload pipeline for BillsOnChain. Full HTTP — login, captcha solving, receipt upload via pure `fetch()`. Zero browser dependency.
 
 ## Features
 
-- **HTTP Login** — Capsolver Turnstile solving, session cookie extraction
-- **Stealth Upload** — Playwright + CloakBrowser (source-level fingerprint patches)
+- **HTTP Login** — Turnstile solving (Capsolver / 2Captcha), session cookie extraction
+- **Full HTTP Upload** — PDF receipt upload via `fetch()` with cookie auth, zero browser
 - **9 Receipt Categories** — Food, Transport, Utilities, Healthcare, Entertainment, Shopping, Travel, Education, Subscriptions
 - **32 Real Brand Logos** — Indomaret, Alfamart, Grab, Gojek, PLN, Netflix, etc.
 - **Multi-Account** — Process multiple accounts from `account.txt`
-- **Fingerprint Rotation** — 10 unique browser fingerprints (Chrome/Edge, Win/Mac/Linux)
+- **Fingerprint Rotation** — 10 unique header fingerprints (Chrome/Edge, Win/Mac/Linux)
 - **Proxy Support** — HTTP, SOCKS4, SOCKS5 with auto-fallback to local
 
 ## Setup
@@ -51,5 +51,4 @@ node run.js --delay-min 3 --delay-max 8  # Custom delay between uploads
 ## Requirements
 
 - Node.js 18+
-- CloakBrowser Chromium binary (auto-installed via `cloakbrowser` pip package)
-- Capsolver API key for Turnstile solving
+- Capsolver or 2Captcha API key for Turnstile solving

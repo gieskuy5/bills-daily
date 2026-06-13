@@ -80,10 +80,14 @@ class ReceiptPDF {
   // ── Header: logo left, info right ──
   header(logoFile, companyName, companyDetails, recipientName, recipientAddr, accountInfo) {
     // Logo + company name (left)
+    this._logoFile = null;
+    this._logoEndX = 0;
     if (logoFile) {
       const fp = path.join(LOGO_DIR, logoFile);
       if (fs.existsSync(fp)) {
-        this.doc.image(fp, this.marginL, this.y, { width: 80 });
+        this.doc.image(fp, this.marginL, this.y, { width: 60 });
+        this._logoFile = logoFile;
+        this._logoEndX = this.marginL + 70;  // logo width + gap
       }
     }
     this.doc.font('Helvetica-Bold').fontSize(12).fillColor('#000');
@@ -122,8 +126,11 @@ class ReceiptPDF {
 
   // ── Title + period ──
   title(bigTitle, period) {
+    // Start title after logo if logo exists
+    const titleX = this._logoEndX > 0 ? this._logoEndX : this.marginL;
+    const titleW = this.W - this.marginR - titleX;
     this.doc.font('Helvetica-Bold').fontSize(18).fillColor('#000');
-    this.doc.text(bigTitle, this.marginL, this.y, { width: this.contentW });
+    this.doc.text(bigTitle, titleX, this.y, { width: titleW });
     this.y += 24;
     if (period) {
       this.doc.font('Helvetica').fontSize(10).fillColor('#000');

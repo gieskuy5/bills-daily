@@ -1,0 +1,6 @@
+{
+  "api_base": "https://bocapi.billsonchain.io",
+  "site_url": "https://billsonchain.io",
+  "capsolver_key": "YOUR_CAPSOLVER_API_KEY",
+  "callback_url": "https://billsonchain.io/dashboard"
+}

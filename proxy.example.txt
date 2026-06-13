@@ -1,0 +1,10 @@
+# Proxy list — one per line
+# Supports: http, https, socks4, socks5
+# Formats:
+#   socks5://user:pass@host:port
+#   socks5://host:port
+#   http://user:pass@host:port
+#   http://host:port
+#   host:port (default: http)
+#
+# If empty → auto-fallback to local network

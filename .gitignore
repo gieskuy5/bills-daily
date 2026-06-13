@@ -1,0 +1,7 @@
+node_modules/
+config.json
+account.txt
+proxy.txt
+sessions.json
+results.json
+*.pdf

@@ -118,7 +118,7 @@ class ReceiptPDF {
       if (fs.existsSync(fp)) {
         const logoW = 90;
         this.doc.image(fp, this.cx - logoW / 2, this.y, { width: logoW });
-        this.y += 95;
+        this.y += 72;
       }
     }
 
@@ -217,7 +217,7 @@ class ReceiptPDF {
       if (fs.existsSync(fp)) {
         const logoW = 80;
         this.doc.image(fp, this.cx - logoW / 2, this.y, { width: logoW });
-        this.y += 85;
+        this.y += 62;
       }
     }
 

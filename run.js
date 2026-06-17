@@ -372,10 +372,10 @@ async function createDispatcher(proxy) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// RECEIPT GENERATOR (pure Node.js)
+// RECEIPT GENERATOR (struk-app style — Indonesian thermal receipts)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { generateRandomReceipt: generateReceipt } = require('./receipts.js');
+const { generateReceipt } = require('./struk-gen.js');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FULL HTTP UPLOAD (no browser)
@@ -605,7 +605,25 @@ async function main() {
   console.log(`${'═'.repeat(60)}\n`);
 }
 
-main().catch(err => {
-  console.error(`\n💥 Fatal: ${err.message}`);
-  process.exit(1);
-});
+// ─── Module exports (for daily-upload.js) ───────────────────────────────────
+async function loginAccount(email, password) {
+  const fp = nextFp();
+  const { sessionToken, user } = await httpLogin(email, password, fp, null);
+  return { token: sessionToken, cookie: `__Secure-better-auth.session_token=${sessionToken}`, user };
+}
+
+async function uploadOne(sessionToken) {
+  const fp = nextFp();
+  const result = await uploadBills(sessionToken, fp, null, 1);
+  return result;
+}
+
+// ─── Run if invoked directly ────────────────────────────────────────────────
+if (require.main === module) {
+  main().catch(err => {
+    console.error(`\n💥 Fatal: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { loginAccount, uploadOne, uploadBills, httpLogin, getUserStats, solveTurnstile };
